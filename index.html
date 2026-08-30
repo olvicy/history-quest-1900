@@ -476,6 +476,9 @@
                 const dot = document.createElement('div');
                 dot.style.left = `${hs.x}%`;
                 dot.style.top = `${hs.y}%`;
+                
+                // ХОВАЄМО КНОПКУ ПРИ СТВОРЕННІ (вона повністю прозора)
+                dot.style.opacity = '0';
 
                 // ОСОБЛИВИЙ ДИЗАЙН ДЛЯ ЗАГАДКОВОГО ГОДИННИКА
                 if (hs.id === 's4h2') {
@@ -489,7 +492,7 @@
                             </div>
                         `;
                     } else if (isCompleted && isSecretFullyCompleted) {
-                        // Портал закрито (всі таємниці знайдено) - виглядає як звичайна пройдена точка
+                        // Портал закрито (всі таємниці знайдено)
                         dot.className = `absolute w-6 h-6 sm:w-8 sm:h-8 -ml-3 -mt-3 sm:-ml-4 sm:-mt-4 rounded-full cursor-pointer transition-all border-2 flex items-center justify-center shadow-[0_0_10px_rgba(255,255,255,0.5)] z-20 group bg-emerald-500/80 border-emerald-300`;
                         dot.innerHTML = `<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>`;
                     } else {
@@ -528,17 +531,15 @@
                     playClick();
                     if (isCompleted) {
                         if (hs.id === 's4h2' && !isSecretFullyCompleted) {
-                            // РОЗУМНИЙ ПОРТАЛ: перевіряє прогрес у потаємній кімнаті
+                            // РОЗУМНИЙ ПОРТАЛ
                             if (questState.completedTasks.includes('s6h1')) {
-                                enterSecretLocation(7); // Відразу кидає до п'єдесталу, якщо куля пройдена
+                                enterSecretLocation(7); 
                             } else {
-                                enterSecretLocation(6); // Починає з кулі, якщо ще не пройдена
+                                enterSecretLocation(6); 
                             }
                         } else if (hs.id === 's4h2' && isSecretFullyCompleted) {
-                            // Портал закрито після виконання всіх завдань
                             showToast("Портал зачинено. Усі таємниці розкрито!", "info");
                         } else {
-                            // Звичайні пройдені завдання
                             showToast("Завдання вже виконано!", "info");
                         }
                     } else {
@@ -547,6 +548,19 @@
                 });
 
                 elHotspots.appendChild(dot);
+                
+                // ЗАТРИМКА ТА ПЛАВНА ПОЯВА КНОПОК
+                setTimeout(() => {
+                    dot.style.transitionProperty = 'opacity';
+                    dot.style.transitionDuration = '0.5s';
+                    dot.style.opacity = '1';
+                    
+                    // Очищуємо технічні стилі після появи, щоб не зламати ефект збільшення при наведенні мишки
+                    setTimeout(() => {
+                        dot.style.transitionProperty = '';
+                        dot.style.transitionDuration = '';
+                    }, 500);
+                }, 600); // 600 мс (0.6 секунди) очікування, поки вантажиться картинка
             });
         }
 
@@ -849,6 +863,17 @@
                 }
             }
         });
+        // БЕЗПЕЧНА ОПТИМІЗАЦІЯ ДЛЯ ТЕЛЕФОНІВ
+        const mobileFix = document.createElement('style');
+        mobileFix.innerHTML = `
+            @media (max-width: 768px) {
+                #intro-modal > div, #task-modal > div, #triumph-modal > div {
+                    max-height: 82vh !important;
+                    overflow-y: auto !important;
+                }
+            }
+        `;
+        document.head.appendChild(mobileFix);
         tailwind.config = {
             theme: {
                 extend: {
