@@ -396,36 +396,55 @@
             
             questState.currentScene = sceneId;
             
+            // 1. ОДРАЗУ ховаємо старі точки (пульсуючі кнопки)
+            elHotspots.innerHTML = '';
+            
+            // 2. Робимо стару картинку напівпрозорою, поки йде завантаження нової
+            elImage.style.transition = 'opacity 0.3s ease-in-out';
+            elImage.style.opacity = '0'; // Завдяки цьому екран плавно стемнішає
             elImage.classList.add('blur-enter');
-            setTimeout(() => {
-                elImage.src = scene.file;
-                elSceneName.textContent = scene.name;
-                elImage.classList.remove('blur-enter');
-            }, 300);
 
+            // 3. Оновлюємо компас
             if (sceneId <= TOTAL_MAIN_SCENES) {
                 const angle = (sceneId - 1) * (360 / TOTAL_MAIN_SCENES);
                 elCompass.style.transform = `rotate(${angle}deg)`;
             }
 
+            // 4. Оновлюємо кнопки навігації (стрілки та повернення)
             if (scene.isSecret) {
                 elNavPrev.classList.add('hidden');
                 elNavNext.classList.add('hidden');
                 elBtnReturn.classList.remove('hidden');
                 questState.visitedSecret = true;
-            } else if (sceneId === 8) {
+            } else if (sceneId === 8) { // Фінальна сцена
                 elNavPrev.classList.add('hidden');
                 elNavNext.classList.add('hidden');
                 elBtnReturn.classList.add('hidden');
-                elHotspots.innerHTML = '';
-                return;
             } else {
                 elNavPrev.classList.remove('hidden');
                 elNavNext.classList.remove('hidden');
                 elBtnReturn.classList.add('hidden');
             }
 
-            renderHotspots(sceneId);
+            // 5. МАГІЯ СИНХРОНІЗАЦІЇ: чекаємо реального завантаження
+            const tempImg = new Image();
+            tempImg.onload = () => {
+                // Цей блок виконається ТІЛЬКИ коли телефон на 100% завантажить нову картинку
+                elImage.src = scene.file;
+                elSceneName.textContent = scene.name;
+                
+                // Плавно висвітлюємо нову локацію
+                elImage.style.opacity = '1';
+                elImage.classList.remove('blur-enter');
+                
+                // Якщо це не фінальна кімната (8), малюємо нові точки
+                if (sceneId !== 8) {
+                    renderHotspots(sceneId);
+                }
+            };
+            
+            // Даємо команду почати завантаження
+            tempImg.src = scene.file;
         }
 
         document.getElementById('nav-prev').addEventListener('click', () => {
