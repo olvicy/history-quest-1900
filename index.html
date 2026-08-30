@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Історія ХХ століття: 3… 2… 1…</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; overflow-x: hidden; }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .glass-modal { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.2); }
+        .scene-transition { transition: filter 0.4s ease-in-out, opacity 0.4s ease-in-out; }
+        .blur-enter { filter: blur(10px); opacity: 0.5; }
+        
+        /* Compass Animation */
+        #compass { transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        
+        /* Custom scrollbar for inventory */
+        ::-webkit-scrollbar { height: 8px; width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col relative select-none">
+
+    <!-- Top UI Bar -->
+    <header class="glass-panel sticky top-0 z-40 p-4 shadow-lg flex justify-between items-center">
+        <div class="flex items-center gap-4">
+            <!-- Compass -->
+            <div class="relative w-12 h-12 flex items-center justify-center bg-slate-800 rounded-full border-2 border-slate-600 shadow-inner">
+                <div id="compass" class="w-8 h-8 text-amber-400 flex items-center justify-center">
+                    <svg viewBox="0 0 24 24" fill="currentColor" class="w-full h-full"><path d="M12 2L16 10L22 12L16 14L12 22L8 14L2 12L8 10L12 2Z"/></svg>
+                </div>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-wider text-slate-100 hidden sm:block">ГОДИННИК ЕПОХИ</h1>
+                <p id="scene-name" class="text-sm font-semibold text-amber-400">Локація...</p>
+            </div>
+        </div>
+        <div class="flex gap-6 text-sm font-semibold">
+            <div class="flex flex-col items-center">
+                <span class="text-slate-400 text-xs uppercase">Обов'язкові</span>
+                <div class="flex items-center gap-2 text-emerald-400">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span id="mandatory-progress" class="text-lg">0/4</span>
+                </div>
+            </div>
+            <div class="flex flex-col items-center">
+                <span class="text-slate-400 text-xs uppercase">Секрети</span>
+                <div class="flex items-center gap-2 text-amber-400">
+                    <span>⭐</span>
+                    <span id="bonus-progress" class="text-lg">0</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Viewport -->
+    <main class="flex-grow flex items-center justify-center p-2 sm:p-6 relative">
+        <!-- Navigation Arrows (Cyclic) -->
+        <button id="nav-prev" class="absolute left-2 sm:left-8 z-30 p-2 sm:p-4 rounded-full glass-panel hover:bg-slate-700 hover:scale-110 transition hidden group">
+            <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+        </button>
+
+        <div class="relative w-full max-w-6xl shadow-2xl rounded-2xl overflow-hidden border border-slate-700 bg-black aspect-[16/9]">
+            <!-- Scene Image -->
+            <img id="scene-image" src="1.png" class="w-full h-full object-cover scene-transition" alt="Панорама локації" draggable="false">
+            
+            <!-- Hotspots Container -->
+            <div id="hotspots-container" class="absolute inset-0 z-20"></div>
+            
+            <!-- Return Button (for secret locations) -->
+            <button id="btn-return" class="absolute top-4 left-4 z-40 glass-panel px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-700 transition hidden">
+                ← Повернутися
+            </button>
+        </div>
+
+        <button id="nav-next" class="absolute right-2 sm:right-8 z-30 p-2 sm:p-4 rounded-full glass-panel hover:bg-slate-700 hover:scale-110 transition hidden group">
+            <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        </button>
+    </main>
+
+    <!-- Inventory Panel -->
+    <footer class="glass-panel z-40 p-4 shrink-0 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.3)]">
+        <h3 class="text-xs uppercase text-slate-400 font-bold mb-2 tracking-widest">Інвентар та Нагороди</h3>
+        <div id="inventory-list" class="flex flex-wrap gap-3 pb-2 min-h-[60px]">
+            <p id="empty-inventory" class="text-slate-500 text-sm italic w-full text-center mt-2">Поки що порожньо...</p>
+        </div>
+    </footer>
+
+    <!-- MODALS -->
+
+    <!-- Intro Modal (Step 1: Title Splash, Step 2: Legend) -->
+    <div id="intro-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+        <!-- Step 1: Title Splash Screen -->
+        <div id="intro-step-1" class="glass-modal max-w-xl w-full rounded-2xl p-10 shadow-2xl text-center border-t-4 border-amber-500">
+            <div class="text-6xl mb-4 animate-pulse">⏳</div>
+            <h2 class="text-3xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-500 mb-2">Історія ХХ століття:<br>3… 2… 1…</h2>
+            <p class="text-slate-400 text-sm mb-8 tracking-widest uppercase font-semibold">Віртуальний освітній квест</p>
+            <button id="btn-to-legend" class="bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-10 rounded-xl transition shadow-[0_0_20px_rgba(217,119,6,0.5)] transform hover:scale-105">
+                Почати місію
+            </button>
+        </div>
+
+        <!-- Step 2: Legend & Rules -->
+        <div id="intro-step-2" class="bg-gradient-to-br from-indigo-900/95 to-black border-2 border-indigo-500 w-full max-w-2xl rounded-3xl p-8 sm:p-12 shadow-[0_0_80px_rgba(99,102,241,0.6)] text-center hidden animate-[fadeIn_0.5s_ease-out]">
+            <div class="text-6xl mb-4 animate-pulse">⏳</div>
+            <h2 class="text-3xl sm:text-4xl font-extrabold mb-6 text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 to-purple-500 drop-shadow-lg uppercase tracking-wider">Вітаю тебе, Хранителю Часу!</h2>
+            
+            <div class="text-indigo-100 space-y-4 mb-8 text-left leading-relaxed text-base sm:text-lg">
+                <p>На календарі <b class="text-amber-400 font-bold">31 грудня 1900 року</b>. За кілька годин світ має зробити крок у нове, бурхливе ХХ століття. Але темні сили хаосу розібрали Головний Годинник Епохи, викравши п'ять Шестерень Часу.<br><b>Якщо їх не повернути, ХХ століття ніколи не настане,<br> а людство застрягне в часовій петлі.</b></p>
+                <p><strong class="text-white">Мета:</strong> Знайти 4 Шестерні Часу в різних локаціях, щоб відкрити фінальний замок і здобути 5-ту Шестерню.</p>
+                <p><strong class="text-white">Правила:</strong> Шукай активні зони (пульсуючі точки) на локаціях. Виконуй обов'язкові завдання для просування сюжетом.</p>
+                
+                <div class="p-5 bg-indigo-950/60 border border-indigo-500/50 rounded-2xl text-indigo-200 shadow-inner mt-6">
+                    <span class="text-xl inline-block mb-2">✨</span> <b class="text-white uppercase tracking-wider text-sm">Потаємна локація:</b><br> Виконуючи додаткові бонусні завдання на локаціях, ти зможеш відшукати прихований портал до секретної кімнати, де на тебе чекають важливі артефакти та цінні підказки для фіналу!
+                </div>
+            </div>
+            
+            <button id="btn-start" class="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold py-4 px-12 rounded-xl transition shadow-[0_0_20px_rgba(99,102,241,0.5)] transform hover:scale-105 inline-block text-lg border border-indigo-400 uppercase tracking-widest">
+                Вирушити в місію
+            </button>
+        </div>
+    </div>
+
+    <!-- Task Modal -->
+    <div id="task-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm hidden">
+        <div class="glass-modal max-w-xl w-full rounded-3xl p-8 shadow-2xl relative border border-slate-600">
+            <button id="btn-close-task" class="absolute top-5 right-5 text-slate-400 hover:text-white transition">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <div id="task-content"></div>
+        </div>
+    </div>
+
+    <!-- Triumph Modal -->
+    <div id="triumph-modal" class="fixed inset-0 z-[70] flex items-center justify-center p-4 hidden pointer-events-none bg-black/80 backdrop-blur-sm">
+        <div class="bg-gradient-to-br from-indigo-900/95 to-black border-2 border-indigo-500 w-full max-w-2xl rounded-3xl p-8 sm:p-12 shadow-[0_0_80px_rgba(99,102,241,0.6)] text-center pointer-events-auto animate-[fadeIn_0.5s_ease-out]">
+            <div class="text-7xl mb-6 animate-pulse">🌌</div>
+            <h2 class="text-4xl sm:text-5xl font-extrabold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 to-purple-500 drop-shadow-lg uppercase tracking-wider">Тріумф!</h2>
+            <h3 class="text-xl sm:text-2xl text-indigo-100 mb-6 font-medium">Вітаю з перемогою, Хранителю Часу!</h3>
+            <p class="text-indigo-200 mb-8 leading-relaxed text-lg">Ти запустив Годинник Епохи!<br> ХХ століття розпочалося завдяки твоїм знанням!</p>
+            
+            <div class="bg-indigo-950/60 rounded-2xl p-6 mb-8 inline-block text-left w-full max-w-md mx-auto border border-indigo-500/50 shadow-inner">
+                <p class="text-sm text-indigo-300 uppercase font-bold mb-4 tracking-widest text-center">Твоя статистика</p>
+                <ul class="space-y-3 text-white text-lg">
+                    <li class="flex justify-between items-center border-b border-indigo-500/30 pb-2"><span>Зібрано Шестерень:</span> <span class="font-bold text-emerald-400">5/5</span></li>
+                    <li class="flex justify-between items-center border-b border-indigo-500/30 pb-2"><span>Знайдено секретів:</span> <span id="stat-bonus" class="font-bold text-amber-400">0</span></li>
+                    <li class="flex justify-between items-center"><span>Потаємна локація:</span> <span id="stat-secret" class="font-bold">Ні</span></li>
+                </ul>
+            </div>
+            
+            <button onclick="location.reload()" class="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-4 px-12 rounded-xl transition shadow-[0_0_20px_rgba(99,102,241,0.5)] transform hover:scale-105 block mx-auto text-lg border border-indigo-400">
+                Пройти знову
+            </button>
+        </div>
+    </div>
+
+    <!-- Toast Notification (Повідомлення) -->
+    <div id="toast" class="fixed top-16 sm:top-24 left-1/2 transform -translate-x-1/2 bg-indigo-900/95 backdrop-blur-md border-2 border-indigo-400 text-white px-6 py-4 rounded-2xl shadow-[0_0_50px_rgba(99,102,241,0.6)] transition-all duration-300 opacity-0 scale-75 z-[100] pointer-events-none flex items-center gap-3 text-center">
+        <span id="toast-icon" class="text-3xl animate-bounce"></span>
+        <span id="toast-message" class="text-lg sm:text-xl font-bold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 to-white"></span>
+    </div>
+
+    <!-- JAVASCRIPT GAME LOGIC -->
+    <script>
+        /* === AUDIO SYSTEM === */
+        let audioCtx;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        function playTone(freq, type, duration, vol=0.1) {
+            if(!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+        const playClick = () => { playTone(600, 'sine', 0.1, 0.05); playTone(800, 'sine', 0.15, 0.05); };
+        const playSuccess = () => { playTone(440, 'triangle', 0.1, 0.1); setTimeout(()=>playTone(554, 'triangle', 0.1, 0.1), 100); setTimeout(()=>playTone(659, 'triangle', 0.3, 0.1), 200); };
+        const playError = () => { playTone(300, 'sawtooth', 0.2, 0.1); setTimeout(()=>playTone(250, 'sawtooth', 0.3, 0.1), 150); };
+        
+        // НОВИЙ УРОЧИСТИЙ ЗВУК ДЛЯ ФІНАЛУ (Класичні фанфари "Та-да-да-ДААА!")
+        const playTriumph = () => {
+            const vol = 0.08; // Трохи тихіше, щоб звучало чисто
+            // Використовуємо 'sawtooth' (пилкоподібну хвилю), вона імітує труби
+            playTone(392, 'sawtooth', 0.15, vol); 
+            setTimeout(() => playTone(392, 'sawtooth', 0.15, vol), 200);
+            setTimeout(() => playTone(392, 'sawtooth', 0.15, vol), 400);
+            
+            // Фінальний потужний мажорний акорд, який тягнеться довше
+            setTimeout(() => {
+                playTone(523, 'sawtooth', 1.2, vol); 
+                playTone(659, 'sawtooth', 1.2, vol); 
+                playTone(784, 'sawtooth', 1.2, vol); 
+            }, 600);
+        };
+
+// МАГІЧНИЙ ЗВУК ДЛЯ ПОЯВИ ЛЕГЕНДИ
+        const playReveal = () => {
+            playTone(440, 'sine', 0.5, 0.08); 
+            setTimeout(()=>playTone(554, 'sine', 0.5, 0.08), 100); 
+            setTimeout(()=>playTone(659, 'sine', 1.0, 0.08), 200); 
+        };
+
+        /* === GAME STATE & DATA === */
+        const TOTAL_MAIN_SCENES = 5;
+        
+        const questState = {
+            currentScene: 1,
+            inventory: [],
+            completedTasks: [],
+            visitedSecret: false,
+            mandatoryTotal: 4
+        };
+
+        const scenesData = {
+            1: {
+                name: "Локація 1/5: Майстерня Індустріалізації", file: "1.png",
+                hotspots: [
+                    { id: 's1h1', x: 26, y: 78, name: "Металева скриня", isRequired: true, type: "number",
+                      text: "Щоб індустріалізація пішла швидше, потрібно було звільнити робочі руки. Згадай рік скасування кріпосного права в Наддніпрянській Україні.",
+                      answer: "1861", reward: "Шестерня Часу №1" },
+                    { id: 's1h2', x: 83, y: 23, name: "Сяючий глобус", isRequired: false, type: "radio",
+                      text: "Яку європейську імперію у XIX столітті через її багатонаціональний склад називали «клаптиковою»?",
+                      options: ["Російська", "Османська", "Австрійська", "Британська"],
+                      answer: "австрійська", reward: "Лінза Істини (фрагмент 1/2)" }
+                ]
+            },
+            2: {
+                name: "Локація 2/5: Кімната Таємного Товариства", file: "2.png",
+                hotspots: [
+                    { id: 's2h1', x: 53, y: 69, name: "Запечатаний сувій", isRequired: true, type: "text",
+                      text: "Цей сувій належить першій українській політичній партії, створеній у 1890 році у Львові Іваном Франком та Михайлом Павликом. Згадай її абревіатуру.",
+                      answer: "рурп", reward: "Шестерня Часу №2" },
+                    { id: 's2h2', x: 19, y: 32, name: "Старовинна картина", isRequired: false, type: "text",
+                      text: "Тут мав бути портрет автора, чий твір, виданий у 1798 році, став початком українського національного відродження. Напиши його прізвище.",
+                      answer: "котляревський", reward: "Записник із підказкою" }
+                ]
+            },
+            3: {
+                name: "Локація 3/5: Барикади Європи", file: "3.png",
+                hotspots: [
+                    { id: 's3h1', x: 84, y: 50, name: "Покинута гармата", isRequired: true, type: "text",
+                      text: "У 1848-1849 роках Європою прокотилася хвиля революцій, спрямованих проти абсолютизму. Яку поетичну назву отримала ця серія подій? (два слова).",
+                      answer: "весна народів", reward: "Шестерня Часу №3" },
+                    { id: 's3h2', x: 59, y: 78, name: "Шкіряна сумка", isRequired: false, type: "radio",
+                      text: "Тут лежать креслення пароплавів і потягів. Яку країну в XIX столітті називали «майстернею світу»?",
+                      options: ["Франція", "Німеччина", "Велика Британія", "США"],
+                      answer: "велика британія", reward: "Оправа Лінзи Істини (фрагмент 2/2)" }
+                ]
+            },
+            4: {
+                name: "Локація 4/5: Салон Культурного Відродження", file: "4.png",
+                hotspots: [
+                    { id: 's4h1', x: 55, y: 58, name: "Різьблена шкатулка", isRequired: true, type: "range",
+                      min: 1800, max: 1900, step: 1,
+                      text: "Шкатулка відкриється, якщо вказати рік першого видання збірки Тараса Шевченка «Кобзар».",
+                      answer: "1840", reward: "Шестерня Часу №4" },
+                    { id: 's4h2', x: 18, y: 13, name: "Загадковий годинник", isRequired: false, type: "combo",
+                      text: "Тут немає звичного запитання. Ти відчуваєш, як зібрана Лінза Істини (фрагменти з Майстерні та Барикад) вібрує в інвентарі. Годинник має заглиблення у формі ока. Жодних сумнівів — настав час діяти! Встав Лінзу, щоб побачити приховане.",
+                      condition: () => questState.inventory.includes("Лінза Істини (фрагмент 1/2)") && questState.inventory.includes("Оправа Лінзи Істини (фрагмент 2/2)"),
+                      onSuccess: () => { 
+                          const portalDiv = document.createElement('div');
+                          portalDiv.className = 'fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-[fadeIn_0.5s_ease-out]';
+                          portalDiv.innerHTML = `
+                              <div class="bg-gradient-to-br from-indigo-900/90 to-black border-2 border-indigo-500 rounded-3xl p-8 max-w-lg text-center shadow-[0_0_80px_rgba(99,102,241,0.6)]">
+                                  <div class="text-7xl mb-6 animate-pulse">🌀</div>
+                                  <h2 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 to-indigo-500 mb-4 drop-shadow-md">ПОРТАЛ ВІДКРИТО!</h2>
+                                  <p class="text-xl text-indigo-100 mb-8 leading-relaxed">
+                                      Ти ідеально поєднав обидва фрагменти Лінзи Істини! Простір довкола годинника починає викривлятися, відкриваючи шлях <br> до <b>Потаємної локації</b>.
+                                  </p>
+                                  <button onclick="this.parentElement.parentElement.remove(); enterSecretLocation(6);" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-10 rounded-xl transition transform hover:scale-110 shadow-[0_0_20px_rgba(99,102,241,0.4)]">
+                                      Увійти в портал
+                                  </button>
+                              </div>
+                          `;
+                          document.body.appendChild(portalDiv);
+                      } 
+                    }
+                ]
+            },
+            5: {
+                name: "Локація 5/5: Головний Механізм (Вежа)", file: "5.png",
+                hotspots: [
+                    { id: 's5h1', x: 50, y: 28, name: "Порожній механізм", isRequired: true, type: "combo_text",
+                      text: "Шестерні на місці! <br>Залишилося останнє запитання:<br> Хто з європейських політиків об'єднав Німеччину<br> «залізом і кров'ю»?",
+                      condition: () => countGears() >= 4,
+                      conditionFailMsg: "Потрібно зібрати всі 4 Шестерні Часу, щоб активувати механізм!",
+                      answer: "бісмарк", onSuccess: () => { winGame(); } }
+                ]
+            },
+            6: {
+                name: "Потаємна локація: Архів Забутих Історій", file: "6.png", isSecret: true,
+                hotspots: [
+                    { id: 's6h1', x: 82, y: 79, name: "Кришталева куля", isRequired: false, type: "click",
+                      text: "Торкнись кулі, щоб отримати найважливіше знання Майстра. Воно допоможе розблокувати Головний Механізм на Вежі!",
+                      reward: "Підказка до фіналу: шукай Залізного канцлера",
+                      onSuccess: () => {
+                          const hintDiv = document.createElement('div');
+                          hintDiv.className = 'fixed inset-0 z-[60] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-[fadeIn_0.5s_ease-out]';
+                          hintDiv.innerHTML = `
+                              <div class="bg-gradient-to-br from-amber-900/90 to-black border-2 border-amber-500 rounded-3xl p-8 max-w-lg text-center shadow-[0_0_80px_rgba(245,158,11,0.6)]">
+                                  <div class="text-7xl mb-6 animate-bounce">🔮</div>
+                                  <h2 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-500 mb-4 drop-shadow-md">ВИДІННЯ МАЙСТРА</h2>
+                                  <p class="text-xl text-amber-100 mb-8 font-serif italic leading-relaxed">
+                                      «Коли станеш перед порожнім механізмом Головного Годинника, згадай прізвище архітектора Німецької імперії. <br>Історія запам'ятала його не як монарха, а як...<br><span class="text-4xl font-bold text-white mt-4 inline-block bg-amber-600/50 px-6 py-2 rounded-xl border border-amber-400">ЗАЛІЗНОГО КАНЦЛЕРА</span>»
+                                  </p>
+                                  <button onclick="this.parentElement.parentElement.remove(); enterSecretLocation(7);" class="bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold py-3 px-10 rounded-xl transition transform hover:scale-110 shadow-[0_0_20px_rgba(245,158,11,0.4)]">
+                                      Я запам'ятав!
+                                  </button>
+                              </div>
+                          `;
+                          document.body.appendChild(hintDiv);
+                      } 
+                    }
+                ]
+            },
+            7: {
+                name: "Потаємна локація: Кабінет Майстра Часу", file: "7.png", isSecret: true,
+                hotspots: [
+                    { id: 's7h1', x: 50, y: 69, name: "Сяючий п'єдестал", isRequired: false, type: "text",
+                      text: "Де у 1846 році була створена таємна політична організація, до якої входили Микола Костомаров, Пантелеймон Куліш, Василь Білозерський, Тарас Шевченко та інші? (одне слово).",
+                      answer: "Київ", reward: "Таємний сувій Майстра",
+                      onSuccess: () => {
+                          const returnDiv = document.createElement('div');
+                          returnDiv.className = 'fixed inset-0 z-[60] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-[fadeIn_0.5s_ease-out]';
+                          returnDiv.innerHTML = `
+                              <div class="bg-gradient-to-br from-indigo-900/90 to-black border-2 border-indigo-500 rounded-3xl p-8 max-w-lg text-center shadow-[0_0_80px_rgba(99,102,241,0.6)]">
+                                  <div class="text-6xl mb-6 animate-bounce">📜</div>
+                                  <h2 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-purple-500 mb-4 drop-shadow-md">УСІ СЕКРЕТИ ЗНАЙДЕНО!</h2>
+                                  <p class="text-xl text-indigo-100 mb-6 leading-relaxed">
+                                      Ти здобув Таємний сувій Майстра!<br>У цій кімнаті більше немає завдань!
+                                  </p>
+                                  <div class="p-4 bg-indigo-950/50 border-l-4 border-indigo-500 rounded-r-xl mb-8">
+                                      <p class="text-indigo-200 text-lg font-medium">
+                                          Зверни увагу на лівий верхній кут екрана — натисни кнопку <br><b class="text-white text-xl uppercase mt-2 inline-block">«Повернутися»</b>,<br> щоб вийти з порталу та продовжити пошук обов'язкових Шестерень!
+                                      </p>
+                                  </div>
+                                  <button onclick="this.parentElement.parentElement.remove(); document.getElementById('btn-return').classList.add('animate-pulse', 'bg-indigo-600'); setTimeout(()=>document.getElementById('btn-return').classList.remove('animate-pulse', 'bg-indigo-600'), 4000);" class="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3 px-10 rounded-xl transition transform hover:scale-110 shadow-[0_0_20px_rgba(99,102,241,0.4)]">
+                                      Зрозуміло!
+                                  </button>
+                              </div>
+                          `;
+                          document.body.appendChild(returnDiv);
+                      } 
+                    }
+                ]
+            },
+            8: { name: "Тріумф", file: "8.png" }
+        };
+
+        /* === DOM ELEMENTS === */
+        const elImage = document.getElementById('scene-image');
+        const elHotspots = document.getElementById('hotspots-container');
+        const elSceneName = document.getElementById('scene-name');
+        const elCompass = document.getElementById('compass');
+        const elNavPrev = document.getElementById('nav-prev');
+        const elNavNext = document.getElementById('nav-next');
+        const elBtnReturn = document.getElementById('btn-return');
+        const elInventory = document.getElementById('inventory-list');
+        const elEmptyInv = document.getElementById('empty-inventory');
+        const elMandatoryProg = document.getElementById('mandatory-progress');
+        const elBonusProg = document.getElementById('bonus-progress');
+        
+        const elTaskModal = document.getElementById('task-modal');
+        const elTaskContent = document.getElementById('task-content');
+        
+        let currentHotspot = null;
+
+        /* === INTRO FLOW === */
+        document.getElementById('btn-to-legend').addEventListener('click', () => {
+            initAudio(); // Вмикаємо аудіосистему вже при першому кліці гравця!
+            playReveal(); // Запускаємо магічний звук
+            document.getElementById('intro-step-1').classList.add('hidden');
+            document.getElementById('intro-step-2').classList.remove('hidden');
+        });
+
+        document.getElementById('btn-start').addEventListener('click', () => {
+            playClick(); // Тут initAudio вже не обов'язковий, але для підстраховки залишаємо звичайний клік
+            document.getElementById('intro-modal').classList.add('hidden');
+            renderScene(questState.currentScene);
+        });
+
+        /* === NAVIGATION === */
+        function renderScene(sceneId) {
+            const scene = scenesData[sceneId];
+            if (!scene) return;
+            
+            questState.currentScene = sceneId;
+            
+            elImage.classList.add('blur-enter');
+            setTimeout(() => {
+                elImage.src = scene.file;
+                elSceneName.textContent = scene.name;
+                elImage.classList.remove('blur-enter');
+            }, 300);
+
+            if (sceneId <= TOTAL_MAIN_SCENES) {
+                const angle = (sceneId - 1) * (360 / TOTAL_MAIN_SCENES);
+                elCompass.style.transform = `rotate(${angle}deg)`;
+            }
+
+            if (scene.isSecret) {
+                elNavPrev.classList.add('hidden');
+                elNavNext.classList.add('hidden');
+                elBtnReturn.classList.remove('hidden');
+                questState.visitedSecret = true;
+            } else if (sceneId === 8) {
+                elNavPrev.classList.add('hidden');
+                elNavNext.classList.add('hidden');
+                elBtnReturn.classList.add('hidden');
+                elHotspots.innerHTML = '';
+                return;
+            } else {
+                elNavPrev.classList.remove('hidden');
+                elNavNext.classList.remove('hidden');
+                elBtnReturn.classList.add('hidden');
+            }
+
+            renderHotspots(sceneId);
+        }
+
+        document.getElementById('nav-prev').addEventListener('click', () => {
+            playClick();
+            let nextId = questState.currentScene - 1;
+            if (nextId < 1) nextId = TOTAL_MAIN_SCENES;
+            renderScene(nextId);
+        });
+
+        document.getElementById('nav-next').addEventListener('click', () => {
+            playClick();
+            let nextId = questState.currentScene + 1;
+            if (nextId > TOTAL_MAIN_SCENES) nextId = 1;
+            renderScene(nextId);
+        });
+
+        elBtnReturn.addEventListener('click', () => {
+            playClick();
+            renderScene(4);
+        });
+
+        let touchStartX = 0;
+        elImage.addEventListener('touchstart', e => touchStartX = e.changedTouches[0].screenX, {passive:true});
+        elImage.addEventListener('touchend', e => {
+            if (questState.currentScene > TOTAL_MAIN_SCENES) return;
+            let touchEndX = e.changedTouches[0].screenX;
+            if (touchEndX < touchStartX - 50) document.getElementById('nav-next').click();
+            if (touchEndX > touchStartX + 50) document.getElementById('nav-prev').click();
+        }, {passive:true});
+
+        /* === HOTSPOTS RENDERING === */
+        function renderHotspots(sceneId) {
+            elHotspots.innerHTML = '';
+            const scene = scenesData[sceneId];
+            if (!scene.hotspots) return;
+
+            scene.hotspots.forEach(hs => {
+                const isCompleted = questState.completedTasks.includes(hs.id);
+                // Перевіряємо, чи пройдено фінальне завдання у потаємній локації (П'єдестал)
+                const isSecretFullyCompleted = questState.completedTasks.includes('s7h1'); 
+                
+                if (hs.id === 's4h2') {
+                    const hasLens1 = questState.inventory.includes("Лінза Істини (фрагмент 1/2)");
+                    const hasLens2 = questState.inventory.includes("Оправа Лінзи Істини (фрагмент 2/2)");
+                    if (!hasLens1 || !hasLens2) return;
+                }
+
+                const dot = document.createElement('div');
+                dot.style.left = `${hs.x}%`;
+                dot.style.top = `${hs.y}%`;
+
+                // ОСОБЛИВИЙ ДИЗАЙН ДЛЯ ЗАГАДКОВОГО ГОДИННИКА
+                if (hs.id === 's4h2') {
+                    if (isCompleted && !isSecretFullyCompleted) {
+                        // Відкритий портал (можна зайти, таємниці ще не розкрито)
+                        dot.className = `absolute w-10 h-10 sm:w-12 sm:h-12 -ml-5 -mt-5 sm:-ml-6 sm:-mt-6 cursor-pointer z-30 group transition-transform hover:scale-110`;
+                        dot.innerHTML = `
+                            <div class="absolute inset-0 bg-emerald-500 rounded-full animate-ping opacity-60"></div>
+                            <div class="relative w-full h-full bg-gradient-to-br from-emerald-800 to-black border-2 border-emerald-400 rounded-full shadow-[0_0_20px_rgba(16,185,129,0.8)] flex items-center justify-center text-xl sm:text-2xl">
+                                🌀
+                            </div>
+                        `;
+                    } else if (isCompleted && isSecretFullyCompleted) {
+                        // Портал закрито (всі таємниці знайдено) - виглядає як звичайна пройдена точка
+                        dot.className = `absolute w-6 h-6 sm:w-8 sm:h-8 -ml-3 -mt-3 sm:-ml-4 sm:-mt-4 rounded-full cursor-pointer transition-all border-2 flex items-center justify-center shadow-[0_0_10px_rgba(255,255,255,0.5)] z-20 group bg-emerald-500/80 border-emerald-300`;
+                        dot.innerHTML = `<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>`;
+                    } else {
+                        // Ще не активований годинник
+                        dot.className = `absolute w-10 h-10 sm:w-12 sm:h-12 -ml-5 -mt-5 sm:-ml-6 sm:-mt-6 cursor-pointer z-30 group transition-transform hover:scale-110`;
+                        dot.innerHTML = `
+                            <div class="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-60"></div>
+                            <div class="relative w-full h-full bg-gradient-to-br from-indigo-800 to-black border-2 border-indigo-400 rounded-full shadow-[0_0_20px_rgba(99,102,241,0.8)] flex items-center justify-center text-xl sm:text-2xl">
+                                👁️
+                            </div>
+                        `;
+                    }
+                } else if (hs.id === 's6h1' && !isCompleted) {
+                    // НОВИЙ ДИЗАЙН ДЛЯ КРИШТАЛЕВОЇ КУЛІ (Контрастний неоново-блакитний)
+                    dot.className = `absolute w-8 h-8 sm:w-10 sm:h-10 -ml-4 -mt-4 sm:-ml-5 sm:-mt-5 rounded-full cursor-pointer transition-all border-2 border-cyan-300 flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.8)] z-20 group bg-cyan-500/80 animate-pulse hover:scale-125`;
+                    dot.innerHTML = `<div class="w-3 h-3 rounded-full bg-white shadow-[0_0_10px_white]"></div>`;
+                } else {
+                    // СТАНДАРТНИЙ ДИЗАЙН ДЛЯ ІНШИХ ТОЧОК
+                    dot.className = `absolute w-6 h-6 sm:w-8 sm:h-8 -ml-3 -mt-3 sm:-ml-4 sm:-mt-4 rounded-full cursor-pointer transition-all border-2 flex items-center justify-center shadow-[0_0_10px_rgba(255,255,255,0.5)] z-20 group`;
+                    
+                    if (isCompleted) {
+                        dot.classList.add('bg-emerald-500/80', 'border-emerald-300');
+                        dot.innerHTML = `<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>`;
+                    } else {
+                        dot.classList.add(hs.isRequired ? 'bg-rose-500/80' : 'bg-amber-500/80', 'border-white', 'animate-pulse', 'hover:scale-125');
+                        dot.innerHTML = `<div class="w-2 h-2 rounded-full bg-white"></div>`;
+                    }
+                }
+
+                const tooltip = document.createElement('div');
+                tooltip.className = `absolute -top-10 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition pointer-events-none whitespace-nowrap border border-slate-600 backdrop-blur-sm`;
+                tooltip.textContent = hs.name;
+                dot.appendChild(tooltip);
+
+                dot.addEventListener('click', () => {
+                    playClick();
+                    if (isCompleted) {
+                        if (hs.id === 's4h2' && !isSecretFullyCompleted) {
+                            // РОЗУМНИЙ ПОРТАЛ: перевіряє прогрес у потаємній кімнаті
+                            if (questState.completedTasks.includes('s6h1')) {
+                                enterSecretLocation(7); // Відразу кидає до п'єдесталу, якщо куля пройдена
+                            } else {
+                                enterSecretLocation(6); // Починає з кулі, якщо ще не пройдена
+                            }
+                        } else if (hs.id === 's4h2' && isSecretFullyCompleted) {
+                            // Портал закрито після виконання всіх завдань
+                            showToast("Портал зачинено. Усі таємниці розкрито!", "info");
+                        } else {
+                            // Звичайні пройдені завдання
+                            showToast("Завдання вже виконано!", "info");
+                        }
+                    } else {
+                        openTaskModal(hs);
+                    }
+                });
+
+                elHotspots.appendChild(dot);
+            });
+        }
+
+        /* === TASK SYSTEM === */
+        function openTaskModal(hs) {
+            currentHotspot = hs;
+            
+            // --- ОСОБЛИВЕ ВІКНО ДЛЯ ЗАГАДКОВОГО ГОДИННИКА ---
+            if (hs.id === 's4h2') {
+                let html = `
+                    <div class="text-center p-2">
+                        <div class="text-6xl mb-4 animate-pulse">👁️</div>
+                        <h3 class="text-2xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-purple-500 mb-4 uppercase tracking-widest">${hs.name}</h3>
+                        <div class="bg-indigo-950/50 border-l-4 border-indigo-500 p-4 mb-6 rounded-r-xl text-left">
+                            <p class="text-indigo-100 text-sm sm:text-base leading-relaxed italic">
+                                ${hs.text}
+                            </p>
+                        </div>
+                `;
+
+                if (hs.condition && !hs.condition()) {
+                    html += `<p class="text-rose-400 font-medium p-4 bg-rose-900/30 rounded-lg border border-rose-500/30 text-center mb-6">Лінза Істини ще не зібрана. Вам потрібні обидва фрагменти!</p>`;
+                    html += `<button onclick="closeTaskModal()" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-4 rounded-xl transition">Повернутися до пошуків</button>`;
+                } else {
+                    html += `
+                        <div class="flex justify-center items-center gap-3 mb-8">
+                            <div class="p-2 sm:p-3 bg-indigo-900/60 rounded-xl border border-indigo-500/50 text-indigo-200 text-xs sm:text-sm shadow-inner flex flex-col items-center"><span class="text-xl mb-1">🧩</span> Фрагмент 1</div>
+                            <div class="text-3xl text-indigo-400 animate-pulse">+</div>
+                            <div class="p-2 sm:p-3 bg-indigo-900/60 rounded-xl border border-indigo-500/50 text-indigo-200 text-xs sm:text-sm shadow-inner flex flex-col items-center"><span class="text-xl mb-1">⭕</span> Фрагмент 2</div>
+                        </div>
+                        <button onclick="submitTask(event)" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-4 px-4 rounded-xl transition transform hover:scale-105 shadow-[0_0_20px_rgba(99,102,241,0.4)] text-lg border border-indigo-400">
+                            ✨ Активувати Лінзу Істини
+                        </button>
+                    `;
+                }
+                html += `</div>`;
+                elTaskContent.innerHTML = html;
+                elTaskModal.classList.remove('hidden');
+                return;
+            }
+
+            // --- ОСОБЛИВЕ ВІКНО ДЛЯ КРИШТАЛЕВОЇ КУЛІ ---
+            if (hs.id === 's6h1') {
+                let html = `
+                    <div class="text-center p-2">
+                        <div class="text-6xl mb-4 animate-pulse">🔮</div>
+                        <h3 class="text-2xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-500 mb-4 uppercase tracking-widest">${hs.name}</h3>
+                        <div class="bg-amber-950/50 border-l-4 border-amber-500 p-4 mb-8 rounded-r-xl text-left">
+                            <p class="text-amber-100 text-sm sm:text-base leading-relaxed italic">
+                                ${hs.text}
+                            </p>
+                        </div>
+                        <button onclick="submitTask(event)" class="w-full bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-white font-bold py-4 px-4 rounded-xl transition transform hover:scale-105 shadow-[0_0_20px_rgba(245,158,11,0.4)] text-lg border border-amber-400">
+                            ✨ Торкнутися кулі
+                        </button>
+                    </div>
+                `;
+                elTaskContent.innerHTML = html;
+                elTaskModal.classList.remove('hidden');
+                return;
+            }
+
+            // --- ОСОБЛИВЕ ВІКНО ДЛЯ ФІНАЛЬНОГО МЕХАНІЗМУ ---
+            if (hs.id === 's5h1') {
+                let html = `
+                    <div class="text-center p-2">
+                        <div class="text-7xl mb-4 animate-[spin_4s_linear_infinite]">⚙️</div>
+                        <h3 class="text-3xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-500 mb-6 uppercase tracking-widest">${hs.name}</h3>
+                `;
+
+                if (hs.condition && !hs.condition()) {
+                    html += `
+                        <p class="text-rose-400 font-medium p-4 bg-rose-900/30 rounded-xl border border-rose-500/30 text-center mb-6 text-lg">
+                            Механізм не працює! Поки що зібрано Шестерень: <b class="text-white">${countGears()} з 4</b>.<br><br>
+                            <span class="text-sm text-slate-300">💡 Закрий це вікно і натисни на стрілочку <b>◄ на краю екрана</b>, щоб переглянути попередні локації. Шукай невиконані червоні завдання!</span>
+                        </p>
+                        <button onclick="closeTaskModal()" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-4 px-4 rounded-xl transition text-lg">Зрозуміло, йду шукати</button>
+                    `;
+                } else {
+                    html += `
+                        <div class="bg-amber-950/50 border-2 border-amber-500 p-6 mb-8 rounded-2xl shadow-inner">
+                            <p class="text-amber-100 text-xl sm:text-2xl font-bold leading-relaxed">
+                                ${hs.text}
+                            </p>
+                        </div>
+                        <form id="task-form" onsubmit="submitTask(event)" class="space-y-6">
+                            <input type="text" id="task-input" class="w-full bg-slate-800 border-2 border-amber-500/50 text-white px-6 py-4 rounded-xl focus:outline-none focus:border-amber-400 text-center text-2xl tracking-wider shadow-inner" placeholder="Ваша відповідь..." autocomplete="off" required autofocus>
+                            <button type="submit" class="w-full bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-slate-900 font-extrabold py-4 px-4 rounded-xl transition transform hover:scale-105 shadow-[0_0_20px_rgba(245,158,11,0.5)] text-xl border border-amber-400 uppercase">
+                                Запустити Годинник
+                            </button>
+                        </form>
+                    `;
+                }
+                html += `</div>`;
+                elTaskContent.innerHTML = html;
+                elTaskModal.classList.remove('hidden');
+                
+                const input = document.getElementById('task-input');
+                if(input) setTimeout(()=>input.focus(), 50);
+                return;
+            }
+            // --- КІНЕЦЬ ОСОБЛИВИХ ВІКОН ---
+
+            // СТАНДАРТНЕ ВІКНО ДЛЯ ВСІХ ІНШИХ ЗАВДАНЬ
+            let html = `<h3 class="text-2xl sm:text-3xl font-extrabold text-white mb-4">${hs.name}</h3>`;
+
+            if (hs.type === 'combo' || hs.type === 'combo_text') {
+                if (hs.condition && !hs.condition()) {
+                    let failMsg = hs.conditionFailMsg || "Не вистачає необхідних предметів!";
+                    
+                    html += `<p class="text-rose-400 font-medium p-4 bg-rose-900/30 rounded-xl border border-rose-500/30 text-center mb-6 text-base sm:text-lg leading-relaxed">${failMsg}</p>`;
+                    html += `<button onclick="closeTaskModal()" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-4 px-4 rounded-xl transition text-lg">Зрозуміло, йду шукати</button>`;
+                    elTaskContent.innerHTML = html;
+                    elTaskModal.classList.remove('hidden');
+                    return;
+                }
+            }
+
+            html += `<p class="text-slate-200 text-base sm:text-lg mb-6 leading-relaxed">${hs.text}</p>`;
+
+            html += `<form id="task-form" onsubmit="submitTask(event)" class="space-y-4">`;
+            
+            if (hs.type === 'text' || hs.type === 'combo_text') {
+                html += `<input type="text" id="task-input" class="w-full bg-slate-800 border border-slate-600 text-white px-5 py-4 rounded-xl focus:outline-none focus:border-amber-500 text-lg" placeholder="Введіть відповідь..." autocomplete="off" required autofocus>`;
+            } 
+            else if (hs.type === 'number') {
+                html += `<input type="number" id="task-input" class="w-full bg-slate-800 border border-slate-600 text-white px-5 py-4 rounded-xl focus:outline-none focus:border-amber-500 text-center tracking-widest text-2xl font-mono" placeholder="____" required autofocus>`;
+            } 
+            else if (hs.type === 'radio') {
+                html += `<div class="space-y-3">`;
+                hs.options.forEach((opt) => {
+                    html += `<label class="flex items-center gap-4 p-4 rounded-xl border border-slate-700 hover:bg-slate-800 cursor-pointer transition">
+                                <input type="radio" name="task_radio" value="${opt}" class="text-amber-500 focus:ring-amber-500 bg-slate-700 border-slate-600 w-5 h-5" required>
+                                <span class="text-slate-100 text-lg">${opt}</span>
+                             </label>`;
+                });
+                html += `</div>`;
+            } 
+            else if (hs.type === 'range') {
+                html += `<div class="flex flex-col items-center gap-3">
+                            <span id="range-val" class="text-4xl font-mono font-bold text-amber-400">${Math.floor((hs.min+hs.max)/2)}</span>
+                            <input type="range" id="task-input" min="${hs.min}" max="${hs.max}" step="${hs.step}" value="${Math.floor((hs.min+hs.max)/2)}" class="w-full accent-amber-500 h-2" oninput="document.getElementById('range-val').textContent=this.value">
+                         </div>`;
+            } 
+            
+            let btnText = (hs.type === 'combo' || hs.type === 'click') ? "Активувати" : "Перевірити";
+            html += `<button type="submit" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-4 px-4 rounded-xl transition shadow-lg mt-6 text-lg uppercase tracking-wide">${btnText}</button>`;
+            html += `</form>`;
+
+            elTaskContent.innerHTML = html;
+            elTaskModal.classList.remove('hidden');
+            
+            const input = document.getElementById('task-input');
+            if(input && hs.type !== 'range') setTimeout(()=>input.focus(), 50);
+        }
+
+        function closeTaskModal() {
+            playClick();
+            elTaskModal.classList.add('hidden');
+            currentHotspot = null;
+        }
+        document.getElementById('btn-close-task').addEventListener('click', closeTaskModal);
+        elTaskModal.addEventListener('click', (e) => { if (e.target === elTaskModal) closeTaskModal(); });
+
+        window.submitTask = function(e) {
+            e.preventDefault();
+            const hs = currentHotspot;
+            if (!hs) return;
+
+            let userAnswer = "";
+            if (hs.type === 'text' || hs.type === 'number' || hs.type === 'range' || hs.type === 'combo_text') {
+                userAnswer = document.getElementById('task-input').value;
+            } else if (hs.type === 'radio') {
+                const selected = document.querySelector('input[name="task_radio"]:checked');
+                if (selected) userAnswer = selected.value;
+            }
+
+            let isCorrect = false;
+            if (hs.type === 'click' || hs.type === 'combo') {
+                isCorrect = true;
+            } else if (hs.answer) {
+                isCorrect = userAnswer.toLowerCase().trim() === hs.answer.toLowerCase().trim();
+            }
+
+            if (isCorrect) {
+                playSuccess();
+                questState.completedTasks.push(hs.id);
+                
+                if (hs.reward) {
+                    questState.inventory.push(hs.reward);
+                    showToast(`Отримано: ${hs.reward}`, "success");
+                }
+
+                if (hs.onSuccess) {
+                    hs.onSuccess();
+                }
+
+                updateUI();
+                closeTaskModal();
+                renderHotspots(questState.currentScene);
+            } else {
+                playError();
+                const form = document.getElementById('task-form');
+                if(form) {
+                    form.classList.add('animate-[shake_0.5s_ease-in-out]');
+                    setTimeout(() => form.classList.remove('animate-[shake_0.5s_ease-in-out]'), 500);
+                }
+                showToast("Неправильно. Спробуй ще!", "error");
+            }
+        };
+
+        function enterSecretLocation(id) {
+            closeTaskModal();
+            renderScene(id);
+        }
+
+        function winGame() {
+            closeTaskModal();
+            renderScene(8);
+            
+            // Затримка 500 мс, щоб стандартний звук правильної відповіді встиг ПОВНІСТЮ завершитися
+            setTimeout(() => {
+                playTriumph(); 
+            }, 500); 
+            
+            let bonusCount = 0;
+            const bonusIds = ['s1h2', 's2h2', 's3h2', 's6h1', 's7h1'];
+            bonusIds.forEach(id => { if(questState.completedTasks.includes(id)) bonusCount++; });
+            
+            document.getElementById('stat-bonus').textContent = `${bonusCount}/${bonusIds.length}`;
+            document.getElementById('stat-secret').textContent = questState.visitedSecret ? "Знайдено!" : "Пропущено";
+            document.getElementById('stat-secret').className = questState.visitedSecret ? "font-bold text-emerald-400" : "font-bold text-slate-400";
+
+            // Затримка 2.5 секунди (2500) перед появою вікна з результатами
+            setTimeout(() => {
+                playReveal(); // <-- Повертаємо звук для появи результатів
+		document.getElementById('triumph-modal').classList.remove('hidden');
+            }, 2500); 
+        }
+
+        /* === UI & HELPERS === */
+        function updateUI() {
+            const gears = countGears();
+            elMandatoryProg.textContent = `${gears}/${questState.mandatoryTotal}`;
+            
+            let bonusCount = 0;
+            scenesData[1].hotspots.forEach(h => { if(!h.isRequired && questState.completedTasks.includes(h.id)) bonusCount++; });
+            scenesData[2].hotspots.forEach(h => { if(!h.isRequired && questState.completedTasks.includes(h.id)) bonusCount++; });
+            scenesData[3].hotspots.forEach(h => { if(!h.isRequired && questState.completedTasks.includes(h.id)) bonusCount++; });
+            scenesData[6].hotspots.forEach(h => { if(!h.isRequired && questState.completedTasks.includes(h.id)) bonusCount++; });
+            scenesData[7].hotspots.forEach(h => { if(!h.isRequired && questState.completedTasks.includes(h.id)) bonusCount++; });
+            elBonusProg.textContent = bonusCount;
+
+            elInventory.innerHTML = '';
+            if (questState.inventory.length === 0) {
+                elEmptyInv.style.display = 'block';
+                elInventory.appendChild(elEmptyInv);
+            } else {
+                elEmptyInv.style.display = 'none';
+                questState.inventory.forEach(item => {
+                    const div = document.createElement('div');
+                    const isGear = item.includes('Шестерня');
+                    div.className = `flex-shrink-0 px-3 py-1.5 rounded-lg border text-sm font-medium whitespace-nowrap flex items-center gap-2 ${isGear ? 'bg-amber-900/40 border-amber-500 text-amber-200' : 'bg-slate-700/50 border-slate-500 text-slate-200'}`;
+                    div.innerHTML = `<span>${isGear ? '⚙️' : '🔑'}</span> ${item}`;
+                    elInventory.appendChild(div);
+                });
+            }
+        }
+
+        function countGears() {
+            return questState.inventory.filter(i => i.includes("Шестерня Часу")).length;
+        }
+
+        let toastTimeout;
+        function showToast(msg, type="info") {
+            const toast = document.getElementById('toast');
+            const msgEl = document.getElementById('toast-message');
+            const iconEl = document.getElementById('toast-icon');
+            
+            clearTimeout(toastTimeout);
+            toast.classList.remove('opacity-0', 'scale-75');
+            toast.classList.add('scale-100');
+            msgEl.textContent = msg;
+            
+            if (type === "success") iconEl.innerHTML = "🌟";
+            else if (type === "error") iconEl.innerHTML = "❌";
+            else iconEl.innerHTML = "ℹ️";
+
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('scale-100');
+                toast.classList.add('opacity-0', 'scale-75');
+            }, 1500); 
+        }
+
+        tailwind.config = {
+            theme: {
+                extend: {
+                    keyframes: {
+                        shake: {
+                            '0%, 100%': { transform: 'translateX(0)' },
+                            '10%, 30%, 50%, 70%, 90%': { transform: 'translateX(-5px)' },
+                            '20%, 40%, 60%, 80%': { transform: 'translateX(5px)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
