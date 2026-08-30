@@ -840,7 +840,15 @@
                 toast.classList.add('opacity-0', 'scale-75');
             }, 1500); 
         }
-
+// ФОНОВЕ ЗАВАНТАЖЕННЯ КАРТИНОК (щоб не було затримок)
+        window.addEventListener('load', () => {
+            for (const scene in scenesData) {
+                if (scenesData[scene].bg) {
+                    const img = new Image();
+                    img.src = scenesData[scene].bg;
+                }
+            }
+        });
         tailwind.config = {
             theme: {
                 extend: {
